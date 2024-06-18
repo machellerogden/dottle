@@ -1,14 +1,13 @@
 {
   "name": "dottle",
-  "version": "0.1.5",
+  "version": "1.0.0",
   "description": "AWS State Language to Graphviz DOT language",
-  "bin": "index.js",
-  "main": "index.js",
+  "bin": {
+    "dottle": "./bin/dottle.mjs"
+  },
+  "type": "module",
   "scripts": {
-    "test": "ava test/*.spec.js",
-    "generate-docs": "jsdoc2md --template README.hbs --files ./lib/reader.js > README.md",
-    "clean-check": "git diff --exit-code 2>/dev/null && git diff --cached --exit-code 2>/dev/null || echo 'Please commit changes before publishing.'",
-    "prepare": "npm run test && npm run generate-docs && npm run clean-check"
+    "test": "node test.js | tap-diff"
   },
   "keywords": [
     "graphviz",
@@ -24,15 +23,9 @@
   },
   "author": "Mac Heller-Ogden",
   "license": "MIT",
-  "dependencies": {
-    "async-stream-generator": "^1.0.3",
-    "is-ci": "^2.0.0",
-    "streamface": "0.0.0"
-  },
   "devDependencies": {
-    "ava": "^2.2.0",
-    "jsdoc-to-markdown": "^5.0.0",
-    "pre-commit": "^1.2.2"
+    "zora": "^5.2.0",
+    "tap-diff": "^0.1.1"
   },
   "precommit": [
     "test"

@@ -1,0 +1,178 @@
+{
+  "StartAt": "CreatePrompts",
+  "States": {
+    "CreatePrompts": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "CreateExamples",
+          "States": {
+            "CreateExamples": {
+              "Type": "Map",
+              "ItemProcessor": {
+                "StartAt": "CreateExample",
+                "States": {
+                  "CreateExample": {
+                    "Type": "Parallel",
+                    "Branches": [
+                      {
+                        "StartAt": "FetchExampleIssue",
+                        "States": {
+                          "FetchExampleIssue": {
+                            "Type": "Task",
+                            "Resource": "fetchIssue",
+                            "InputPath": "$$.Map.Item.Value.jiraKey",
+                            "ResultPath": "$.issue",
+                            "End": true
+                          }
+                        }
+                      },
+                      {
+                        "StartAt": "FetchExampleData",
+                        "States": {
+                          "FetchExampleData": {
+                            "Type": "Task",
+                            "Resource": "fetchGoogleSheetsData",
+                            "Parameters": {
+                              "spreadsheetId.$": "$$.Map.Item.Value.spreadsheetId",
+                              "range.$": "$$.Map.Item.Value.worksheetName"
+                            },
+                            "ResultPath": "$.testCases",
+                            "End": true
+                          }
+                        }
+                      }
+                    ],
+                    "ResultPath": "$.example",
+                    "Next": "FormatExampleText"
+                  },
+                  "FormatExampleText": {
+                    "Type": "Task",
+                    "Resource": "formatJiraToTestCasesExamplesText",
+                    "Parameters": {
+                      "issue.$": "$.example[0].issue",
+                      "testCases.$": "$.example[1].testCases"
+                    },
+                    "End": true
+                  }
+                }
+              },
+              "ItemsPath": "$.examples",
+              "ResultPath": "$.exampleTexts",
+              "Next": "FormatSystemText"
+            },
+            "FormatSystemText": {
+              "Type": "Task",
+              "Resource": "formatJiraToTestCasesSystemText",
+              "Parameters": {
+                "examples.$": "$.exampleTexts"
+              },
+              "ResultPath": "$.system",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "FetchIssue",
+          "States": {
+            "FetchIssue": {
+              "Type": "Task",
+              "Resource": "fetchIssue",
+              "InputPath": "$.target.jiraKey",
+              "ResultPath": "$.issue",
+              "Next": "FormatIssueText"
+            },
+            "FormatIssueText": {
+              "Type": "Task",
+              "Resource": "formatIssueText",
+              "InputPath": "$.issue",
+              "ResultPath": "$.issueText",
+              "Next": "FormatPromptText"
+            },
+            "FormatPromptText": {
+              "Type": "Task",
+              "Resource": "formatFinalAnswerQuery",
+              "Parameters": {
+                "text.$": "$.issueText"
+              },
+              "ResultPath": "$.prompt",
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.prompts",
+      "Next": "GenerateCompletion"
+    },
+    "GenerateCompletion": {
+      "Type": "Task",
+      "Resource": "generateCompletionAsTabularData",
+      "Parameters": {
+        "system.$": "$.prompts[0].system",
+        "prompt.$": "$.prompts[1].prompt"
+      },
+      "ResultPath": "$.data",
+      "Next": "CreateAndPopulateWorksheet"
+    },
+    "CreateAndPopulateWorksheet": {
+      "Type": "Task",
+      "Resource": "createAndPopulateWorksheet",
+      "Parameters": {
+        "spreadsheetId.$": "$.target.spreadsheetId",
+        "worksheetName.$": "$.target.worksheetName",
+        "resource.$": "$.data"
+      },
+      "ResultSelector": {
+        "status": "$.statusText",
+        "data": "$.data"
+      },
+      "ResultPath": "$.sheetUpdateResponse",
+      "Next": "CheckStatus"
+    },
+    "CheckStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status",
+          "StringEquals": "SUCCESS",
+          "Next": "PostSlackMessage"
+        },
+        {
+          "Variable": "$.status",
+          "StringEquals": "FAILURE",
+          "Next": "Failure"
+        }
+      ],
+      "Default": "Failure"
+    },
+    "PostSlackMessage": {
+      "Type": "Task",
+      "Resource": "doesntExist",
+      "Parameters": {
+        "status.$": "$.status",
+        "response.$": "$.sheetUpdateResponse"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "Next": "Success"
+        },
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Failure"
+        }
+      ],
+      "Next": "Success"
+    },
+    "Success": {
+      "Type": "Succeed"
+    },
+    "Failure": {
+      "Type": "Fail"
+    }
+  }
+}
