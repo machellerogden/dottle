@@ -1,6 +1,6 @@
 {
   "name": "dottle",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AWS State Language to Graphviz DOT language",
   "bin": {
     "dottle": "./bin/dottle.mjs"
